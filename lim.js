@@ -149,7 +149,19 @@ SIBLE_AUTO_ADS=1
 
 /** Bikin .env kalau belum ada, supaya `nano .env` langsung berisi template. */
 function ensureEnvFile({ quiet = false } = {}) {
-  if (fs.existsSync(ENV_FILE)) return false;
+  // .env kosong (mis. hasil "simpan" buffer kosong di nano) tetap diisi template,
+  // tapi file yang sudah ada isinya tidak pernah ditimpa.
+  const exists = fs.existsSync(ENV_FILE);
+  let existing = '';
+  if (exists) {
+    try {
+      existing = fs.readFileSync(ENV_FILE, 'utf8');
+    } catch {
+      existing = '';
+    }
+    if (existing.trim() !== '') return false;
+  }
+  const verb = exists ? 'diisi template (file kosong)' : 'dibuat dengan template';
   try {
     fs.mkdirSync(path.dirname(ENV_FILE), { recursive: true });
     fs.writeFileSync(ENV_FILE, ENV_TEMPLATE, { mode: 0o600 });
@@ -157,7 +169,7 @@ function ensureEnvFile({ quiet = false } = {}) {
       fs.chmodSync(ENV_FILE, 0o600);
     } catch {}
     if (!quiet) {
-      console.log(C.dim(`i ${path.basename(ENV_FILE)} dibuat dengan template — edit pakai: nano ${path.basename(ENV_FILE)}`));
+      console.log(C.dim(`i ${path.basename(ENV_FILE)} ${verb} — edit pakai: nano ${path.basename(ENV_FILE)}`));
     }
     return true;
   } catch (e) {
@@ -683,7 +695,13 @@ async function cmdLogout() {
 function cmdEnv() {
   const keys = ['SIBLE_IDENTIFIER', 'SIBLE_PASSWORD', 'SIBLE_TOKEN', 'SIBLE_REFRESH_TOKEN', 'SIBLE_API_BASE', 'SIBLE_SLOT_HOURS', 'SIBLE_AUTO_ADS'];
   console.log(C.b(`— ${ENV_FILE} —`));
-  if (!fs.existsSync(ENV_FILE)) return console.log(C.y('  (belum ada)'));
+  if (!fs.existsSync(ENV_FILE)) return console.log(C.y('  (belum ada) — jalankan: node lim.js'));
+  if (!envHasCreds()) {
+    const size = fs.statSync(ENV_FILE).size;
+    console.log(C.y(`  (belum ada kredensial terisi — ukuran ${size} byte)`));
+    console.log(C.dim('  isi pakai: node lim.js setup   |   atau: node lim.js edit'));
+    return;
+  }
   for (const k of keys) {
     const v = ENV[k];
     if (v === undefined) continue;

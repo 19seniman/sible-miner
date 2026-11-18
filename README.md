@@ -76,6 +76,24 @@ SIBLE_TOKEN=
 SIBLE_REFRESH_TOKEN=
 ```
 
+### Kalau `nano .env` terbuka kosong
+
+Itu tanda file `.env` ada tapi isinya 0 byte (mis. pernah disimpan sebagai buffer kosong). Keluar dari nano, jalankan sekali, lalu buka lagi:
+
+```bash
+node lim.js     # isi template dimasukkan otomatis ke .env yang kosong
+nano .env
+```
+
+Cek kondisinya kapan pun:
+
+```bash
+ls -la .env     # ukuran file
+node lim.js env # ringkasan isi; bilang "(belum ada kredensial terisi)" kalau masih kosong
+```
+
+File yang **sudah ada isinya** tidak pernah ditimpa otomatis.
+
 ### Verifikasi
 
 ```bash
