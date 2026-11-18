@@ -158,3 +158,42 @@ Untuk simulasi slot cepat, jalankan mock dengan `SLOT_SEC=6`.
 - Kode referral `Wolfalliance` valid (`/auth/referral-code?code=Wolfalliance` → `exists: true`); dipakai saat mendaftar akun baru, bukan lewat script ini.
 - Jangan set interval lebih rapat dari ~15 detik; server punya rate limit dan bisa menandai akun.
 - `.env` berisi kredensial: jangan commit, jangan share screenshot isinya.
+
+---
+
+## 7. Pengaman (anti-pola-bot)
+
+Script ini dirancang jadi klien yang **sopan**, bukan yang menyamar. Semua bisa diatur di `.env`:
+
+| Pengaman | Default | Env |
+|---|---|---|
+| Jeda minimal antar request tulis | 4000 ms | `SIBLE_MIN_GAP_MS` |
+| Jitter acak pada jeda | ±25% | `SIBLE_JITTER_PCT` |
+| Retry dengan backoff eksponensial | 4× dari 5 s | `SIBLE_MAX_RETRIES`, `SIBLE_BACKOFF_MS` |
+| Hormati `Retry-After` saat 429/5xx | otomatis | — |
+| Timeout request | 20 s | `SIBLE_TIMEOUT_MS` |
+| Kunci proses (tolak instance kedua) | aktif di `auto` | — |
+| Kuota harian lokal | ad 30 / claim 10 / start 10 | `SIBLE_DAILY_*_CAP` |
+| Jeda acak antar-ad | 2,2–4,8 s | — |
+| Header klien web resmi | UA + Origin + Referer | `SIBLE_USER_AGENT`, `SIBLE_ACCEPT_LANGUAGE` |
+
+Kuota harian ini **bukan** angka server — sengaja lebih ketat, supaya kalau server longgar pun polanya tidak ekstrem. Kalau kuota lokal habis, script berhenti sendiri:
+
+```
+LOCAL_DAILY_CAP: kuota ads harian habis (30/30) — script berhenti sendiri demi keamanan akun
+```
+
+Counter disimpan di `.sible-state.json` (reset otomatis saat tanggal UTC berganti), dan `auto` memakai `.sible.lock` sehingga dua instance tidak bisa jalan bersamaan:
+
+```
+✖ ALREADY_RUNNING: proses lain masih jalan (pid 2073). Hentikan dulu: kill 2073
+```
+
+Yang **tidak** dilakukan — dan sebaiknya jangan ditambahkan:
+
+- rotasi proxy/IP atau multi-akun (pola yang paling cepat memicu ban),
+- bypass captcha/challenge,
+- spoofing fingerprint TLS (JA3) atau rotasi User-Agent tiap request,
+- interval di bawah ~15 detik untuk mengejar reward.
+
+Tidak ada jaminan bebas dari deteksi: kalau platform mengubah aturan atau memasang challenge, script bisa berhenti atau akun kena tindakan. Pengaman di atas memastikan kalau itu terjadi, penyebabnya bukan karena script menembak terlalu cepat.
