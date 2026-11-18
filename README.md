@@ -62,7 +62,17 @@ node lim.js login --identifier emailkamu@mail.com --password 'passwordkamu'
 node lim.js login --token 'eyJhbGciOi...'
 ```
 
-Kalau akun belum verifikasi email, tambahkan `--otp 123456`.
+### Login yang butuh kode OTP
+
+Sebagian akun membalas `{needsOtp: true, email, resendAfterSec}` — artinya login belum selesai sampai kode dari email dimasukkan. Script menanganinya otomatis:
+
+```bash
+node lim.js login            # ditanya kode OTP langsung
+node lim.js login --otp 123456   # versi non-interaktif
+node lim.js login --resend       # minta kode baru kalau sudah kedaluwarsa
+```
+
+Script mencoba `purpose` `login` lalu `verify_email`, karena server tidak mendokumentasikan yang mana. Kalau kode salah, semua percobaan gagal dengan pesan `OTP_FAILED` — tidak ada token yang tersimpan.
 
 ### Isi `.env` yang diharapkan
 
@@ -161,7 +171,7 @@ Stop: `Ctrl+C`, atau `pkill -f "lim.js auto"`.
 |---|---|
 | `setup` | wizard isi `.env` tanpa editor (uji dulu, baru simpan) |
 | `edit` | buka `.env` di `nano`/`$EDITOR`, dibuat otomatis kalau belum ada |
-| `login` | simpan kredensial/token ke `.env` |
+| `login` | simpan kredensial/token ke `.env` (`--otp`, `--resend` untuk akun ber-OTP) |
 | `logout` | hapus token dari `.env` (email/password tetap) |
 | `env` | tampilkan `.env` (disamarkan) |
 | `me` | profil akun |

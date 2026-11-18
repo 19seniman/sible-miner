@@ -681,6 +681,26 @@ function printUser(u) {
   for (const [k, v] of rows) console.log(`  ${k.padEnd(13)} ${typeof v === 'object' ? JSON.stringify(v) : v}`);
 }
 
+/** Kirim kode OTP; purpose dicoba berurutan karena server tidak mendokumentasikannya. */
+async function submitOtp(email, code) {
+  const tries = ['login', 'verify_email', undefined];
+  const errs = [];
+  for (const purpose of tries) {
+    const body = { email, code };
+    if (purpose) body.purpose = purpose;
+    try {
+      const r = await rawRequest('POST', '/auth/verify-otp', { body, auth: false });
+      console.log(C.g(`✔ OTP diterima (purpose: ${purpose ?? 'tanpa purpose'})`));
+      return r;
+    } catch (e) {
+      errs.push(`${purpose ?? 'default'}: ${e.code ?? e.message}`);
+      const retriable = ['OTP_INVALID', 'INVALID_PURPOSE', 'VALIDATION_ERROR', 'BAD_REQUEST', 'NOT_FOUND'];
+      if (!retriable.includes(e.code)) throw e;
+    }
+  }
+  throw new ApiError({ code: 'OTP_FAILED', message: `kode ditolak di semua purpose → ${errs.join(' | ')}` });
+}
+
 async function cmdLogin(flags) {
   if (flags.debug === true) process.env.SIBLE_DEBUG = '1';
   // 1) bearer token
@@ -720,6 +740,16 @@ async function cmdLogin(flags) {
   API_BASE = envGet('SIBLE_API_BASE', DEFAULT_API_BASE);
   console.log(C.dim(`→ kredensial disimpan di ${ENV_FILE} (chmod 600)`));
 
+  if (flags.resend === true) {
+    console.log(C.dim('→ POST /auth/resend-otp'));
+    try {
+      await rawRequest('POST', '/auth/resend-otp', { body: { email: identifier, purpose: 'login' }, auth: false });
+      console.log(C.g('✔ kode OTP baru dikirim'));
+    } catch (e) {
+      console.log(C.y(`  gagal minta kode baru: ${e.message}`));
+    }
+  }
+
   let res;
   try {
     res = await rawRequest('POST', '/auth/login', { body: { identifier, password }, auth: false });
@@ -737,17 +767,31 @@ async function cmdLogin(flags) {
   }
 
   // login bisa balas 200 tapi minta verifikasi dulu (tanpa token)
-  const otpLike = (d) => d && (d.otpSent === true || d.purpose === 'verify_email' || d.verificationRequired === true || d.otpRequired === true);
+  const otpLike = (d) =>
+    d &&
+    (d.needsOtp === true ||
+      d.otpSent === true ||
+      d.purpose === 'verify_email' ||
+      d.verificationRequired === true ||
+      d.otpRequired === true);
   let otp = typeof flags.otp === 'string' ? flags.otp : null;
-  if (otpLike(res.data) && !otp && stdin.isTTY) {
-    console.log(C.y('akun minta verifikasi e-mail — kode OTP dikirim ke emailmu.'));
-    otp = await ask('Kode OTP (6 digit, Enter untuk lewati): ');
+  if (otpLike(res.data)) {
+    const d = res.data ?? {};
+    const email = d.email ?? identifier;
+    const wait = Number(d.resendAfterSec);
+    console.log(C.y('akun ini butuh kode OTP untuk login.'));
+    console.log(C.dim(`  kode dikirim ke ${email}${Number.isFinite(wait) && wait > 0 ? ` · tunggu ${wait}s sebelum minta ulang` : ''}`));
+    if (!otp && stdin.isTTY) otp = await ask('Kode OTP (6 digit, Enter untuk lewati): ');
   }
-  if (otpLike(res.data) && otp) {
-    console.log(C.dim('→ POST /auth/verify-otp'));
-    await rawRequest('POST', '/auth/verify-otp', { body: { email: identifier, code: otp, purpose: 'verify_email' }, auth: false });
-    console.log(C.dim('→ POST /auth/login (ulang setelah verifikasi)'));
-    res = await rawRequest('POST', '/auth/login', { body: { identifier, password }, auth: false });
+  if (otp) {
+    const v = await submitOtp(res.data?.email ?? identifier, otp);
+    // sebagian server langsung memberi token di sini, sebagian perlu login ulang
+    if (extractAuth(v.data)) {
+      res = v;
+    } else {
+      console.log(C.dim('→ POST /auth/login (ulang setelah verifikasi)'));
+      res = await rawRequest('POST', '/auth/login', { body: { identifier, password }, auth: false });
+    }
   }
 
   let user = null;
@@ -757,8 +801,9 @@ async function cmdLogin(flags) {
     if (e.code !== 'NO_TOKEN') throw e;
     console.log(C.r(`✖ ${e.message}`));
     if (otpLike(res.data)) {
-      console.log(C.y('  server minta verifikasi e-mail sebelum memberi token.'));
+      console.log(C.y('  login belum selesai: server masih minta kode OTP.'));
       console.log(C.dim('  kirim kodenya: node lim.js login --otp 123456'));
+      console.log(C.dim('  kode baru:     node lim.js login --resend'));
     }
     console.log(C.dim('  isi respons server (disamarkan):'));
     console.log(C.dim('  ' + JSON.stringify(maskDeep(res.raw), null, 2).split('\n').join('\n  ')));

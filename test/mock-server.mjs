@@ -86,10 +86,28 @@ const server = http.createServer(async (req, res) => {
     state.tokens.set(at, rt);
     state.refresh.set(rt, at);
     const shape = process.env.LOGIN_SHAPE ?? 'flat';
+    if (shape === 'needsotp') {
+      if (!state.verified) return send(res, 200, { needsOtp: true, email: json.identifier, resendAfterSec: 30 });
+      const at = 'acc_' + Math.random().toString(36).slice(2);
+      const rt = 'ref_' + Math.random().toString(36).slice(2);
+      state.tokens.set(at, rt);
+      state.refresh.set(rt, at);
+      return send(res, 200, { accessToken: at, refreshToken: rt, user: { id: 'u1', email: json.identifier } });
+    }
     if (shape === 'nested') return send(res, 200, { tokens: { accessToken: at, refreshToken: rt }, user: { id: 'u1', email: 'tester@mail.com' } });
     if (shape === 'otp') return send(res, 200, { otpSent: true, email: json.identifier, purpose: 'verify_email' });
     return send(res, 200, { accessToken: at, refreshToken: rt, user: { id: 'u1', email: 'tester@mail.com', username: 'tester' } });
   }
+
+  if (p === '/auth/verify-otp' && req.method === 'POST') {
+    if (json.code !== '123456') return send(res, 400, { code: 'OTP_INVALID', message: 'Kode OTP salah' }, { path: p });
+    if (json.purpose !== 'login') return send(res, 400, { code: 'OTP_INVALID', message: 'purpose salah' }, { path: p });
+    state.verified = true;
+    state.otpPurpose = json.purpose;
+    return send(res, 200, { verified: true });
+  }
+
+  if (p === '/auth/resend-otp' && req.method === 'POST') return send(res, 200, { sent: true });
 
   if (p === '/auth/refresh' && req.method === 'POST') {
     const at = state.refresh.get(json.refreshToken);
