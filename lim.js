@@ -58,6 +58,66 @@ const C = {
   c: (s) => `\x1b[36m${s}\x1b[0m`,
 };
 
+
+// --- identitas & tampilan ---------------------------------------------------
+
+const BRAND = {
+  name: 'SIBLE MINER',
+  app: 'mine.sible.network',
+  version: '1.2.0',
+  author: '19 Seniman',
+  tip: 'Traktir \u2615',
+  networks: 'BSC \u00b7 ETH \u00b7 Hype',
+  evm: '0xf01fb9a6855f175d3f3e28e00fa617009c38ef59',
+};
+
+const TERM_W = () => Math.max(38, Math.min(process.stdout.columns || 52, 60));
+const visible = (str) => String(str).replace(/\x1b\[[0-9;]*m/g, '');
+const padEndV = (str, w) => str + ' '.repeat(Math.max(0, w - visible(str).length));
+const centerV = (str, w) => {
+  const gap = Math.max(0, w - visible(str).length);
+  const left = Math.floor(gap / 2);
+  return ' '.repeat(left) + str + ' '.repeat(gap - left);
+};
+
+function banner() {
+  const w = TERM_W();
+  const inner = w - 2;
+  console.log('');
+  console.log(C.c('\u256d' + '\u2500'.repeat(inner) + '\u256e'));
+  console.log(C.c('\u2502') + centerV(C.b(BRAND.name) + C.dim('  \u00b7  ' + BRAND.app), inner) + C.c('\u2502'));
+  console.log(C.c('\u2502') + centerV(C.dim('auto mining + auto accelerate'), inner) + C.c('\u2502'));
+  console.log(C.c('\u2570' + '\u2500'.repeat(inner) + '\u256f'));
+  console.log(C.dim(`  v${BRAND.version}  \u00b7  ${API_BASE}`));
+}
+
+function authorBox() {
+  const w = TERM_W();
+  const inner = w - 2;
+  const line = (str) => C.c('\u2502') + ' ' + padEndV(str, inner - 1) + C.c('\u2502');
+  console.log(C.c('\u256d' + '\u2500'.repeat(inner) + '\u256e'));
+  console.log(line(C.dim('author')));
+  console.log(line(C.b(BRAND.author)));
+  console.log(line(C.y(BRAND.tip)));
+  console.log(line(C.dim(BRAND.networks)));
+  console.log(line(C.g(BRAND.evm)));
+  console.log(C.c('\u2570' + '\u2500'.repeat(inner) + '\u256f'));
+}
+
+function section(title) {
+  const w = TERM_W();
+  const label = ` ${title} `;
+  const side = Math.max(2, Math.floor((w - visible(label).length) / 2));
+  console.log('');
+  console.log(C.c('\u2500'.repeat(side)) + C.b(label) + C.c('\u2500'.repeat(Math.max(2, w - side - visible(label).length))));
+}
+
+function kv(key, value, width = 14) {
+  console.log(`  ${C.dim(padEndV(key, width))}${value}`);
+}
+
+const dot = (ok) => (ok ? C.g('\u25cf') : C.dim('\u25cb'));
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const die = (m, code = 1) => {
   console.error(C.r(`✖ ${m}`));
@@ -1015,25 +1075,25 @@ function showStatus(st) {
   const cur = Number(st.currentSessionAmount ?? 0);
   const projected = sid ? cur + (perSec * Math.max(0, endMs - nowServer)) / 1000 : 0;
 
-  console.log(C.b('— mining status —'));
-  console.log(`  total          ${fmtNum(st.totalAmount)} SIBLE`);
-  console.log(`  slot           ${ts(st.slotStartsAt)}  →  ${ts(st.slotEndsAt)}  (${fmtHours(slotHours(st))})`);
-  console.log(`  waktu server   ${ts(st.serverTime)}`);
-  console.log(`  sisa slot      ${hms(endMs - nowServer)}`);
-  console.log(`  session        ${sid ? C.g(sid) : C.dim('idle')}`);
-  console.log(`  slot ini       ${fmtNum(cur)} SIBLE${perSec ? C.dim(` (+${fmtNum(perSec, 6)}/s ≈ ${fmtNum(projected)} saat slot habis)`) : ''}`);
-  console.log(`  canClaim       ${st.canClaim ? C.g('ya') : 'belum'}`);
-  console.log(`  canWatchAd     ${st.canWatchAd ? C.g('ya') : 'belum'}`);
-  if (st.session?.nextAdAt) console.log(`  ad berikutnya  ${ts(st.session.nextAdAt)} (${hms(Date.parse(st.session.nextAdAt) - nowServer)})`);
+  section('mining status');
+  kv('total', `${C.b(C.g(fmtNum(st.totalAmount)))} SIBLE`);
+  kv('slot', `${ts(st.slotStartsAt)}  \u2192  ${ts(st.slotEndsAt)}  ${C.dim(`(${fmtHours(slotHours(st))})`)}`);
+  kv('waktu server', ts(st.serverTime));
+  kv('sisa slot', C.y(hms(endMs - nowServer)));
+  kv('session', sid ? C.g(sid) : C.dim('idle'));
+  kv('slot ini', `${fmtNum(cur)} SIBLE${perSec ? C.dim(` (+${fmtNum(perSec, 6)}/s \u2248 ${fmtNum(projected)} saat habis)`) : ''}`);
+  kv('canClaim', `${dot(st.canClaim)} ${st.canClaim ? C.g('ya') : C.dim('belum')}`);
+  kv('canWatchAd', `${dot(st.canWatchAd)} ${st.canWatchAd ? C.g('ya') : C.dim('belum')}`);
+  if (st.session?.nextAdAt) kv('ad berikutnya', `${ts(st.session.nextAdAt)} ${C.dim(`(${hms(Date.parse(st.session.nextAdAt) - nowServer)})`)}`);
   if (st.session?.adsWatched !== undefined)
-    console.log(`  ads watched    ${st.session.adsWatched}/${st.adMaxPerSession ?? '?'}${st.session.adBoostPct ? C.dim(` (+${st.session.adBoostPct}% boost)`) : ''}`);
-  if (st.slotsPerDay !== undefined) console.log(`  slot harian    ${st.slotsUsedToday ?? '?'}/${st.slotsPerDay}`);
-  if (st.currentHourlyReward !== undefined) console.log(`  rate/jam       ${fmtNum(st.currentHourlyReward, 4)} SIBLE`);
+    kv('ads watched', `${st.session.adsWatched}/${st.adMaxPerSession ?? '?'}${st.session.adBoostPct ? C.dim(` (+${st.session.adBoostPct}% boost)`) : ''}`);
+  if (st.slotsPerDay !== undefined) kv('slot harian', `${st.slotsUsedToday ?? '?'}/${st.slotsPerDay}`);
+  if (st.currentHourlyReward !== undefined) kv('rate/jam', `${fmtNum(st.currentHourlyReward, 4)} SIBLE`);
   if (startMs && endMs > startMs) {
     const pct = Math.max(0, Math.min(1, (nowServer - startMs) / (endMs - startMs)));
     const w = 28;
     const f = Math.round(pct * w);
-    console.log(`  progress       ${C.c('█'.repeat(f) + '░'.repeat(w - f))} ${(pct * 100).toFixed(1)}%`);
+    kv('progress', `${C.c('\u2588'.repeat(f) + '\u2591'.repeat(w - f))} ${(pct * 100).toFixed(1)}%`);
   }
   const known = new Set([
     'totalAmount',
@@ -1317,26 +1377,51 @@ async function cmdRaw(method, p, bodyArg) {
 // Main
 // ---------------------------------------------------------------------------
 
-const HELP = `lim.js — mine.sible.network client (creds in .env)
+function helpScreen() {
+  banner();
+  console.log(`
+${C.b('PENGGUNAAN')}
+  node lim.js <perintah> [opsi]
 
-  setup [--identifier EMAIL [--password P] | --token T] [--force]
-  edit            buka .env di editor (nano), otomatis dibuat kalau belum ada
-  login [--token T | --identifier EMAIL [--password P] [--otp CODE]]
-  logout | env
-  me | status | start | claim | ad
-  tasks | claim-task <id> [--day-key YYYY-MM-DD]
-  referral | apply-ref <CODE>
-  auto [--once] [--dry-run] [--slot-hours 3] [--max-ads N] [--no-ad]
-  get <path> | post <path> '<json>'
+${C.b('PERINTAH')}
+  ${C.c('setup')}      isi .env tanpa editor (kredensial diuji dulu)
+  ${C.c('edit')}       buka .env di editor
+  ${C.c('login')}      login email + password (+ OTP bila diminta)
+  ${C.c('status')}     status mining
+  ${C.c('start')}      mulai slot mining
+  ${C.c('claim')}      klaim slot
+  ${C.c('ad')}         accelerate manual (watch ad)
+  ${C.c('auto')}       mining + accelerate otomatis mengikuti slot
+  ${C.c('me')}         profil akun
+  ${C.c('tasks')}      daftar reward task
+  ${C.c('referral')}   ringkasan referral
+  ${C.c('env')}        lihat isi .env (disamarkan)
+  ${C.c('logout')}     hapus token dari .env
+  ${C.c('about')}      info script & author
+  ${C.c('get')} / ${C.c('post')}   panggil endpoint apa pun
 
-.env keys: SIBLE_IDENTIFIER SIBLE_PASSWORD SIBLE_TOKEN SIBLE_REFRESH_TOKEN
-           SIBLE_API_BASE SIBLE_SLOT_HOURS SIBLE_AUTO_ADS
-guard    : SIBLE_MIN_GAP_MS SIBLE_JITTER_PCT SIBLE_MAX_RETRIES SIBLE_BACKOFF_MS
-           SIBLE_DAILY_AD_CAP SIBLE_DAILY_CLAIM_CAP SIBLE_DAILY_START_CAP
-           SIBLE_TIMEOUT_MS SIBLE_USER_AGENT SIBLE_ACCEPT_LANGUAGE
-Flags   : --json  --env <file>
-Base    : ${API_BASE}
-`;
+${C.b('OPSI')}
+  --json   keluaran JSON mentah
+  --debug  tampilkan request/response
+  --once   auto: satu putaran lalu keluar
+  --dry-run  auto: jangan kirim
+  --no-ad  auto: tanpa accelerate
+
+${C.dim('Base API: ' + API_BASE)}`);
+  authorBox();
+  console.log('');
+}
+
+function about() {
+  banner();
+  authorBox();
+  console.log('');
+  console.log(`  ${C.dim('script')}     lim.js v${BRAND.version}`);
+  console.log(`  ${C.dim('target')}     ${BRAND.app}`);
+  console.log(`  ${C.dim('node')}       ${process.version}`);
+  console.log(`  ${C.dim('dependensi')} tidak ada`);
+  console.log('');
+}
 
 async function main() {
   const { cmd, args, flags } = parseArgs(process.argv.slice(2));
@@ -1351,8 +1436,9 @@ async function main() {
     API_BASE = flags['api-base'];
   }
 
-  if (!cmd) return console.log(HELP);
-  if (cmd === 'help' || flags.help) return console.log(HELP);
+  if (!cmd || cmd === 'help' || flags.help) return helpScreen();
+  if (cmd === 'about') return about();
+  if (cmd === 'version' || flags.version === true || flags.v === true) return console.log(`lim.js v${BRAND.version}`);
 
   switch (cmd) {
     case 'login':

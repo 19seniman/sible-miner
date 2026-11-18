@@ -63,3 +63,14 @@ node lim.js status
 node lim.js auto
 ```
 
+## Author
+
+19 Seniman · Traktir ☕
+
+BSC · ETH · Hype
+
+```
+0xf01fb9a6855f175d3f3e28e00fa617009c38ef59
+```
+
+Tampil juga di script: `node lim.js about`
