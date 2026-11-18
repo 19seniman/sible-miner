@@ -28,8 +28,6 @@ node lim.js auto
 
 ### Menjalankan di Windows (PowerShell)
 
-Script-nya murni Node.js tanpa dependency, jadi jalan apa adanya di Windows — tidak ada `chmod`, `pkill`, atau `nohup`.
-
 **1. Pasang Node.js (sekali saja)**
 
 ```powershell
