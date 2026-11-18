@@ -6,6 +6,42 @@ Butuh **Node.js 18+**. Tidak perlu `npm install`.
 
 ---
 
+## 0. Jalankan cepat (Termux, dari nol sampai mining)
+
+Salin berurutan. Ganti email/password dengan milikmu.
+
+```bash
+# 1) dependensi (sekali saja)
+pkg update && pkg install nodejs git nano termux-api -y
+
+# 2) ambil script
+git clone https://github.com/19seniman/sible-miner.git
+cd sible-miner
+
+# 3) login — diminta password, lalu kode OTP dari email
+node lim.js login
+
+# 4) pastikan token valid
+node lim.js status
+
+# 5) mulai auto-mining di background
+termux-wake-lock
+nohup node lim.js auto > sible-auto.log 2>&1 &
+
+# 6) pantau
+tail -f sible-auto.log
+```
+
+Setelah langkah 5, tidak ada yang perlu dijalankan tiap 3 jam — script mengurus siklus slot sendiri.
+
+Kalau akunmu tidak pakai OTP, langkah 3 bisa langsung:
+
+```bash
+node lim.js login --identifier emailkamu@mail.com --password 'passwordkamu'
+```
+
+---
+
 ## 1. Setup
 
 Ada tiga cara, pilih yang paling nyaman. Semuanya berakhir sama: `.env` berisi kredensial, permission `600`.
@@ -165,6 +201,72 @@ Stop: `Ctrl+C`, atau `pkill -f "lim.js auto"`.
 
 ---
 
+### Menjalankan di Termux (detail)
+
+**Sebelum ditinggal lama:**
+
+```bash
+termux-wake-lock                  # cegah Android mematikan Termux saat layar mati
+```
+
+Lalu di Android: **Settings → Apps → Termux → Battery → Unrestricted**, dan biarkan notifikasi Termux tetap muncul. Tanpa ini, `nohup` pun bisa ikut mati saat HP deep sleep.
+
+**Start / stop / restart:**
+
+```bash
+# start di background
+nohup node lim.js auto > sible-auto.log 2>&1 &
+
+# lihat log (Ctrl+C hanya keluar dari tail, miner tetap jalan)
+tail -f sible-auto.log
+
+# stop
+pkill -f "lim.js auto"
+```
+
+**Log yang sehat:**
+
+```
+5:50:12 PM auto-miner aktif — mode LIVE, auto-accelerate ON
+5:50:12 PM   pengaman: jeda 4000ms ±25% · retry 4× · ad 0/30 · claim 0/10 · start 0/10
+5:50:12 PM idle → start() slot 3 jam
+5:50:13 PM   session sess_8f21 berjalan
+5:50:18 PM   accelerate 1/3 → boost 5%
+5:50:52 PM total 53.22 · slot-ini 0.0021 · sisa 2h 59m · ads 3/3
+5:50:52 PM   tidur 59m 59s
+```
+
+**Jangan jalankan dua instance.** Script menolak sendiri:
+
+```
+✖ ALREADY_RUNNING: proses lain masih jalan (pid 2073). Hentikan dulu: kill 2073
+```
+
+**Kalau proses mati (HP restart / Termux ditutup):**
+
+```bash
+cd ~/sible-miner
+termux-wake-lock
+nohup node lim.js auto > sible-auto.log 2>&1 &
+```
+
+Token tetap tersimpan di `.env`, jadi tidak perlu login ulang selama refresh token masih hidup.
+
+**Alternatif berbasis cron** (kalau lebih suka dijalankan berkala):
+
+```bash
+pkg install cronie -y
+crontab -e
+```
+
+```cron
+0 */3 * * * cd ~/sible-miner && /data/data/com.termux/files/usr/bin/node lim.js auto --once >> sible-auto.log 2>&1
+```
+
+`auto` biasa tetap lebih baik: dia tahu jadwal `nextAdAt` dan slot, jadi tidak menembak di tengah siklus.
+
+---
+
 ## 3. Command lain
 
 | Command | Fungsi |
@@ -239,6 +341,8 @@ Untuk simulasi slot cepat, jalankan mock dengan `SLOT_SEC=6`.
 - Kode referral `Wolfalliance` valid (`/auth/referral-code?code=Wolfalliance` → `exists: true`); dipakai saat mendaftar akun baru, bukan lewat script ini.
 - Jangan set interval lebih rapat dari ~15 detik; server punya rate limit dan bisa menandai akun.
 - `.env` berisi kredensial: jangan commit, jangan share screenshot isinya.
+- Selama refresh token hidup, `auto` memperbarui access token sendiri. Kalau refresh token mati **dan** server meminta OTP, `auto` tidak bisa memasukkan kode secara otomatis — dia berhenti dengan `SESSION_EXPIRED`. Jalankan `node lim.js login` sekali, lalu start `auto` lagi.
+- Kalau muncul `LOCAL_DAILY_CAP`, itu batas aman lokal (ad 30 / claim 10 / start 10 per hari), bukan kerusakan. Naikkan lewat `.env` kalau paham risikonya.
 
 ---
 
