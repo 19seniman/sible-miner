@@ -175,7 +175,9 @@ Stop: `Ctrl+C`, atau `pkill -f "lim.js auto"`.
 | `apply-ref <CODE>` | terapkan kode referral |
 | `get <path>` / `post <path> '<json>'` | panggil endpoint apa pun |
 
-Flag: `--json`, `--env <file>`.
+Flag: `--json`, `--env <file>`, `--debug` (tampilkan request/response mentah, nilai sensitif disamarkan).
+
+Kalau `login` balas `NO_TOKEN`, jalankan `node lim.js login --debug` untuk melihat isi respons server. Kalau server meminta verifikasi e-mail, script akan meminta kode OTP dan mengirimnya ke `/auth/verify-otp`; versi non-interaktif: `node lim.js login --otp 123456`.
 
 ---
 

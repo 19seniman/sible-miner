@@ -519,7 +519,15 @@ async function rawRequest(method, p, { body, auth = true, timeoutMs = GUARD.requ
     }
     if (json && json.success === false) {
       const err = json.error ?? {};
+      if (isDebug()) {
+        console.log(C.dim(`  [debug] ${method} ${p} → HTTP ${res.status} ${err.code ?? ''}`));
+        console.log(C.dim(`  [debug] ${JSON.stringify(maskDeep(json))}`));
+      }
       throw new ApiError({ code: err.code, message: err.message, http: res.status, path: p, details: err.details });
+    }
+    if (isDebug()) {
+      console.log(C.dim(`  [debug] ${method} ${p} → HTTP ${res.status}`));
+      console.log(C.dim(`  [debug] ${JSON.stringify(maskDeep(json))}`));
     }
     return { data: json?.data ?? null, meta: json?.meta ?? null, raw: json, status: res.status };
   }
@@ -569,12 +577,65 @@ const api = {
 // Auth
 // ---------------------------------------------------------------------------
 
+/** Cari token di respons, apa pun bentuk sarangnya: {accessToken} / {tokens:{...}} / {session:{...}}. */
+function extractAuth(payload) {
+  const root = payload ?? {};
+  const seen = new Set();
+  const walk = (o, depth = 0) => {
+    if (!o || typeof o !== 'object' || seen.has(o) || depth > 3) return null;
+    seen.add(o);
+    const at = o.accessToken ?? o.access_token ?? o.accessTokenJwt ?? o.jwt ?? o.token;
+    if (typeof at === 'string' && at.length > 10) {
+      return {
+        accessToken: at,
+        refreshToken: o.refreshToken ?? o.refresh_token ?? null,
+        user: o.user ?? root.user ?? null,
+      };
+    }
+    for (const v of Object.values(o)) {
+      if (v && typeof v === 'object') {
+        const hit = walk(v, depth + 1);
+        if (hit) return hit;
+      }
+    }
+    return null;
+  };
+  return walk(root);
+}
+
 function adoptAuth(payload) {
   const d = payload ?? {};
-  if (!d.accessToken) throw new ApiError({ code: 'NO_TOKEN', message: 'response tidak berisi accessToken' });
-  setTokens({ accessToken: d.accessToken, refreshToken: d.refreshToken ?? session.refreshToken ?? '' });
-  return d.user ?? null;
+  const t = extractAuth(d);
+  if (!t) {
+    const keys = d && typeof d === 'object' ? Object.keys(d) : [];
+    throw new ApiError({
+      code: 'NO_TOKEN',
+      message: `respons tanpa token (field: ${keys.length ? keys.join(', ') : 'kosong'}) — jalankan: node lim.js login --debug`,
+      details: d,
+    });
+  }
+  setTokens({ accessToken: t.accessToken, refreshToken: t.refreshToken ?? session.refreshToken ?? '' });
+  return t.user ?? null;
 }
+
+/** Sembunyikan nilai sensitif sebelum dicetak. */
+function maskDeep(v, depth = 0) {
+  if (v === null || v === undefined) return v;
+  if (typeof v === 'string') {
+    if (v.length <= 12) return v;
+    return `${v.slice(0, 8)}…(${v.length} char)`;
+  }
+  if (typeof v !== 'object' || depth > 4) return v;
+  if (Array.isArray(v)) return v.slice(0, 5).map((x) => maskDeep(x, depth + 1));
+  const out = {};
+  for (const [k, val] of Object.entries(v)) {
+    const sensitive = /token|pass|secret|key|auth|cookie/i.test(k);
+    out[k] = sensitive && typeof val === 'string' ? mask(val, 6) : maskDeep(val, depth + 1);
+  }
+  return out;
+}
+
+const isDebug = () => process.env.SIBLE_DEBUG === '1' || ENV.SIBLE_DEBUG === '1';
 
 /** Login pakai identifier+password dari .env (dipakai juga oleh auto). */
 async function loginWithPassword({ silent = false } = {}) {
@@ -621,6 +682,7 @@ function printUser(u) {
 }
 
 async function cmdLogin(flags) {
+  if (flags.debug === true) process.env.SIBLE_DEBUG = '1';
   // 1) bearer token
   let token = typeof flags.token === 'string' ? flags.token : envGet('SIBLE_TOKEN');
   if (typeof flags.token === 'string' && flags.token) {
@@ -644,7 +706,7 @@ async function cmdLogin(flags) {
 
   // 2) identifier + password
   const identifier = typeof flags.identifier === 'string' ? flags.identifier : typeof flags.email === 'string' ? flags.email : envGet('SIBLE_IDENTIFIER');
-  let password = typeof flags.password === 'string' ? flags.password : null;
+  let password = typeof flags.password === 'string' ? flags.password : envGet('SIBLE_PASSWORD');
   if (!identifier) die('pakai --token <bearer>  atau  --identifier <email/username> [--password]');
   if (!password) {
     password = await ask(stdin.isTTY ? 'Password: ' : '', { mask: stdin.isTTY });
@@ -674,7 +736,34 @@ async function cmdLogin(flags) {
     res = await rawRequest('POST', '/auth/login', { body: { identifier, password }, auth: false });
   }
 
-  const user = adoptAuth(res.data);
+  // login bisa balas 200 tapi minta verifikasi dulu (tanpa token)
+  const otpLike = (d) => d && (d.otpSent === true || d.purpose === 'verify_email' || d.verificationRequired === true || d.otpRequired === true);
+  let otp = typeof flags.otp === 'string' ? flags.otp : null;
+  if (otpLike(res.data) && !otp && stdin.isTTY) {
+    console.log(C.y('akun minta verifikasi e-mail — kode OTP dikirim ke emailmu.'));
+    otp = await ask('Kode OTP (6 digit, Enter untuk lewati): ');
+  }
+  if (otpLike(res.data) && otp) {
+    console.log(C.dim('→ POST /auth/verify-otp'));
+    await rawRequest('POST', '/auth/verify-otp', { body: { email: identifier, code: otp, purpose: 'verify_email' }, auth: false });
+    console.log(C.dim('→ POST /auth/login (ulang setelah verifikasi)'));
+    res = await rawRequest('POST', '/auth/login', { body: { identifier, password }, auth: false });
+  }
+
+  let user = null;
+  try {
+    user = adoptAuth(res.data);
+  } catch (e) {
+    if (e.code !== 'NO_TOKEN') throw e;
+    console.log(C.r(`✖ ${e.message}`));
+    if (otpLike(res.data)) {
+      console.log(C.y('  server minta verifikasi e-mail sebelum memberi token.'));
+      console.log(C.dim('  kirim kodenya: node lim.js login --otp 123456'));
+    }
+    console.log(C.dim('  isi respons server (disamarkan):'));
+    console.log(C.dim('  ' + JSON.stringify(maskDeep(res.raw), null, 2).split('\n').join('\n  ')));
+    process.exit(2);
+  }
   console.log(C.g(`✔ login OK — token ditulis ke ${ENV_FILE}`));
   if (user) printUser(user);
 }

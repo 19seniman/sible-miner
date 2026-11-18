@@ -85,6 +85,9 @@ const server = http.createServer(async (req, res) => {
     const rt = 'ref_' + Math.random().toString(36).slice(2);
     state.tokens.set(at, rt);
     state.refresh.set(rt, at);
+    const shape = process.env.LOGIN_SHAPE ?? 'flat';
+    if (shape === 'nested') return send(res, 200, { tokens: { accessToken: at, refreshToken: rt }, user: { id: 'u1', email: 'tester@mail.com' } });
+    if (shape === 'otp') return send(res, 200, { otpSent: true, email: json.identifier, purpose: 'verify_email' });
     return send(res, 200, { accessToken: at, refreshToken: rt, user: { id: 'u1', email: 'tester@mail.com', username: 'tester' } });
   }
 
