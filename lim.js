@@ -65,7 +65,7 @@ const BRAND = {
   name: 'SIBLE MINER',
   app: 'mine.sible.network',
   version: '1.2.0',
-  author: '19 Seniman',
+  author: '19Seniman',
   tip: 'Traktir \u2615',
   networks: 'BSC \u00b7 ETH \u00b7 Hype',
   evm: '0xf01fb9a6855f175d3f3e28e00fa617009c38ef59',

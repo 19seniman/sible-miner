@@ -65,7 +65,7 @@ node lim.js auto
 
 ## Author
 
-19 Seniman · Traktir ☕
+19Seniman · Traktir ☕
 
 BSC · ETH · Hype
 
