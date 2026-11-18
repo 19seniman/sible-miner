@@ -39,6 +39,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
+import { spawnSync } from 'node:child_process';
 
 // ---------------------------------------------------------------------------
 // Config / .env
@@ -128,6 +129,45 @@ function writeEnvFile(patch, file = ENV_FILE) {
     fs.chmodSync(file, 0o600);
   } catch {}
   return { file, written: Object.keys(patch) };
+}
+
+const ENV_TEMPLATE = `# sible-miner — isi salah satu cara login di bawah, lalu simpan.
+#
+# Cara 1: email/username + password
+SIBLE_IDENTIFIER=
+SIBLE_PASSWORD=
+#
+# Cara 2: bearer token (biarkan kosong kalau pakai cara 1)
+SIBLE_TOKEN=
+SIBLE_REFRESH_TOKEN=
+#
+# Opsional
+SIBLE_API_BASE=https://prod.sible.network/api/v1
+SIBLE_SLOT_HOURS=3
+SIBLE_AUTO_ADS=1
+`;
+
+/** Bikin .env kalau belum ada, supaya `nano .env` langsung berisi template. */
+function ensureEnvFile({ quiet = false } = {}) {
+  if (fs.existsSync(ENV_FILE)) return false;
+  try {
+    fs.mkdirSync(path.dirname(ENV_FILE), { recursive: true });
+    fs.writeFileSync(ENV_FILE, ENV_TEMPLATE, { mode: 0o600 });
+    try {
+      fs.chmodSync(ENV_FILE, 0o600);
+    } catch {}
+    if (!quiet) {
+      console.log(C.dim(`i ${path.basename(ENV_FILE)} dibuat dengan template — edit pakai: nano ${path.basename(ENV_FILE)}`));
+    }
+    return true;
+  } catch (e) {
+    if (!quiet) console.error(C.y(`! gagal membuat ${ENV_FILE}: ${e.message}`));
+    return false;
+  }
+}
+
+function envHasCreds() {
+  return Boolean(ENV.SIBLE_IDENTIFIER || ENV.SIBLE_TOKEN);
 }
 
 let ENV = readEnvFile();
@@ -659,6 +699,139 @@ function cmdEnv() {
 }
 
 // ---------------------------------------------------------------------------
+// Setup / edit .env (tanpa harus paham nano)
+// ---------------------------------------------------------------------------
+
+async function cmdSetup(flags) {
+  ensureEnvFile({ quiet: true });
+
+  const force = flags.force === true;
+  if (fs.existsSync(ENV_FILE) && envHasCreds() && !force) {
+    console.log(C.y(`${ENV_FILE} sudah berisi kredensial.`));
+    console.log(C.dim('  timpa dengan: node lim.js setup --force'));
+    console.log(C.dim('  atau edit manual: node lim.js edit'));
+    return;
+  }
+
+  let identifier = typeof flags.identifier === 'string' ? flags.identifier : typeof flags.email === 'string' ? flags.email : null;
+  let password = typeof flags.password === 'string' ? flags.password : null;
+  let token = typeof flags.token === 'string' ? flags.token : null;
+  const apiBase = typeof flags['api-base'] === 'string' ? flags['api-base'] : null;
+
+  const interactive = !identifier && !token && stdin.isTTY;
+  if (interactive) {
+    console.log(C.b('Setup sible-miner'));
+    console.log('  1) email/username + password');
+    console.log('  2) bearer token');
+    const mode = (await ask('Pilih 1 atau 2 [1]: ')) || '1';
+    if (mode.trim() === '2') {
+      token = await ask('Bearer token: ', { mask: true });
+    } else {
+      identifier = await ask('Email atau username: ');
+      password = await ask('Password: ', { mask: true });
+    }
+  }
+
+  if (!identifier && !token) {
+    console.log(C.y('Tidak ada input. Pakai flag, contoh:'));
+    console.log(C.dim("  node lim.js setup --identifier you@mail.com --password 'secret'"));
+    console.log(C.dim("  node lim.js setup --token 'eyJhbGciOi...'"));
+    process.exit(2);
+  }
+
+  const patch = {};
+  if (token) {
+    patch.SIBLE_TOKEN = String(token).replace(/^Bearer\s+/i, '').trim();
+    patch.SIBLE_REFRESH_TOKEN = '';
+    patch.SIBLE_IDENTIFIER = '';
+    patch.SIBLE_PASSWORD = '';
+  } else {
+    patch.SIBLE_IDENTIFIER = identifier;
+    patch.SIBLE_PASSWORD = password ?? '';
+    patch.SIBLE_TOKEN = '';
+    patch.SIBLE_REFRESH_TOKEN = '';
+  }
+  if (apiBase) patch.SIBLE_API_BASE = apiBase.replace(/\/+$/, '');
+
+  // uji dulu, baru simpan — supaya .env yang sudah jalan tidak tertimpa typo
+  if (apiBase) API_BASE = apiBase.replace(/\/+$/, '');
+  const probe = token
+    ? await (async () => {
+        const prev = session.accessToken;
+        session.accessToken = String(token).replace(/^Bearer\s+/i, '').trim();
+        try {
+          await api.get('/users/me');
+          return true;
+        } catch {
+          session.accessToken = prev;
+          return false;
+        }
+      })()
+    : await rawRequest('POST', '/auth/login', { body: { identifier, password }, auth: false })
+        .then(() => true)
+        .catch((e) => {
+          console.log(C.y(`  ${e.message}`));
+          return false;
+        });
+
+  if (!probe && !force) {
+    console.log(C.y('! tidak disimpan — kredensial belum valid. Ulangi setup atau edit manual.'));
+    console.log(C.dim('  paksa simpan (mis. untuk dibetulkan nanti): tambahkan --force'));
+    process.exit(2);
+  }
+
+  writeEnvFile(patch);
+  ENV = readEnvFile();
+  API_BASE = envGet('SIBLE_API_BASE', DEFAULT_API_BASE);
+  session.accessToken = envGet('SIBLE_TOKEN');
+  session.refreshToken = envGet('SIBLE_REFRESH_TOKEN');
+  console.log(C.g(`✔ ${ENV_FILE} tersimpan (chmod 600)`));
+
+  if (!probe) {
+    console.log(C.y('! kredensial belum terverifikasi (disimpan karena --force)'));
+    process.exit(2);
+  }
+  console.log(C.g('✔ login berhasil — siap jalan: node lim.js auto'));
+}
+
+function cmdEdit() {
+  ensureEnvFile();
+  if (!fs.existsSync(ENV_FILE)) die(`tidak bisa membuat ${ENV_FILE}`);
+
+  if (!stdin.isTTY) {
+    console.log(C.y('bukan terminal interaktif — jalankan langsung di Termux/terminal:'));
+    console.log(`  nano ${ENV_FILE}`);
+    return;
+  }
+
+  const editor = String(flags_editor() || 'nano');
+  const candidates = editor === 'nano' ? ['nano', 'vim', 'vi'] : [editor];
+  for (const ed of candidates) {
+    const r = spawnSync(ed, [ENV_FILE], { stdio: 'inherit' });
+    if (r.error && r.error.code === 'ENOENT') {
+      if (ed === 'nano') {
+        console.log(C.y('nano belum terpasang di Termux.'));
+        console.log(C.dim('  pasang dulu:  pkg update && pkg install nano -y'));
+        console.log(C.dim('  tanpa editor: node lim.js setup'));
+      }
+      continue;
+    }
+    // setelah editor keluar, muat ulang isinya
+    ENV = readEnvFile();
+    API_BASE = envGet('SIBLE_API_BASE', DEFAULT_API_BASE);
+    session.accessToken = envGet('SIBLE_TOKEN');
+    session.refreshToken = envGet('SIBLE_REFRESH_TOKEN');
+    console.log(C.dim(`i ${ENV_FILE} dimuat ulang`));
+    return;
+  }
+  die('tidak ada editor yang bisa dipakai — pakai: node lim.js setup');
+}
+
+function flags_editor() {
+  return process.env.SIBLE_EDITOR || process.env.EDITOR || null;
+}
+
+// ---------------------------------------------------------------------------
 // Mining
 // ---------------------------------------------------------------------------
 
@@ -992,6 +1165,8 @@ async function cmdRaw(method, p, bodyArg) {
 
 const HELP = `lim.js — mine.sible.network client (creds in .env)
 
+  setup [--identifier EMAIL [--password P] | --token T] [--force]
+  edit            buka .env di editor (nano), otomatis dibuat kalau belum ada
   login [--token T | --identifier EMAIL [--password P] [--otp CODE]]
   logout | env
   me | status | start | claim | ad
@@ -1012,6 +1187,9 @@ Base    : ${API_BASE}
 async function main() {
   const { cmd, args, flags } = parseArgs(process.argv.slice(2));
 
+  // .env selalu ada, supaya `nano .env` langsung bisa diisi
+  if (ensureEnvFile()) ENV = readEnvFile();
+
   if (flags.env) {
     process.env.SIBLE_ENV_FILE = String(flags.env);
   }
@@ -1029,6 +1207,10 @@ async function main() {
       return cmdLogout();
     case 'env':
       return cmdEnv();
+    case 'setup':
+      return cmdSetup(flags);
+    case 'edit':
+      return cmdEdit();
   }
 
   const needAuth = ['me', 'status', 'start', 'claim', 'ad', 'tasks', 'claim-task', 'referral', 'apply-ref', 'auto', 'get', 'post'];

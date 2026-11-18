@@ -8,42 +8,91 @@ Butuh **Node.js 18+**. Tidak perlu `npm install`.
 
 ## 1. Setup
 
-```bash
-cp .env.example .env
-```
+Ada tiga cara, pilih yang paling nyaman. Semuanya berakhir sama: `.env` berisi kredensial, permission `600`.
 
-Isi `.env` — **pilih salah satu** cara login:
-
-```dotenv
-# cara 1: email/username + password
-SIBLE_IDENTIFIER=emailkamu@mail.com
-SIBLE_PASSWORD=passwordkamu
-```
-
-```dotenv
-# cara 2: bearer token
-SIBLE_TOKEN=eyJhbGciOi...
-```
-
-Atau biarkan script yang menulis `.env` untukmu:
+### Cara A — tanpa editor (paling anti-error, cocok untuk Termux)
 
 ```bash
-# dari email + password
+node lim.js setup
+```
+
+Script menanyakan pilihan login (email+password atau bearer token), lalu menulis `.env` sendiri. Kredensial diuji dulu sebelum disimpan — kalau salah, `.env` lama tidak ditimpa.
+
+Versi satu baris:
+
+```bash
+node lim.js setup --identifier emailkamu@mail.com --password 'passwordkamu'
+node lim.js setup --token 'eyJhbGciOi...'
+```
+
+### Cara B — `nano .env` (seperti repo pXb)
+
+File `.env` **otomatis dibuat** oleh script kalau belum ada, lengkap dengan template dan komentar. Jadi cukup:
+
+```bash
+node lim.js          # sekali saja, untuk membuat .env
+nano .env
+```
+
+Isi bagian yang relevan, lalu simpan di nano:
+
+```
+Ctrl + O   → Enter   (simpan)
+Ctrl + X             (keluar)
+```
+
+**Catatan penting:** perintahnya `nano .env` — titik dan `env` **menempel**, tanpa spasi. Kalau ditulis `nano . env` (pakai spasi), yang dibuat adalah file bernama `env`, bukan `.env`, dan script tidak akan membacanya.
+
+Kalau `nano` belum ada di Termux:
+
+```bash
+pkg update && pkg install nano -y
+```
+
+Atau pakai editor yang sudah terpasang (`vim`/`vi` dideteksi otomatis), atau langsung:
+
+```bash
+node lim.js edit      # buka .env di editor, buat dulu kalau belum ada
+```
+
+### Cara C — lewat `login`
+
+```bash
 node lim.js login --identifier emailkamu@mail.com --password 'passwordkamu'
-
-# dari bearer token
 node lim.js login --token 'eyJhbGciOi...'
 ```
 
 Kalau akun belum verifikasi email, tambahkan `--otp 123456`.
 
-Cek isi `.env` kapan pun (password/token disamarkan):
+### Isi `.env` yang diharapkan
 
-```bash
-node lim.js env
+```dotenv
+# cara 1: email/username + password
+SIBLE_IDENTIFIER=emailkamu@mail.com
+SIBLE_PASSWORD=passwordkamu
+
+# cara 2: bearer token (kosongkan kalau pakai cara 1)
+SIBLE_TOKEN=
+SIBLE_REFRESH_TOKEN=
 ```
 
-File `.env` dibuat dengan permission `600`, dan sudah masuk `.gitignore`.
+### Verifikasi
+
+```bash
+ls -a                 # .env tersembunyi, harus muncul di sini
+node lim.js env       # isi .env, password/token disamarkan
+node lim.js status    # tes login + lihat status mining
+```
+
+`ls` biasa tidak menampilkan file berawalan titik — itu bukan tanda file gagal dibuat.
+
+### Kenapa `.env` tidak di-commit ke repo
+
+Di repo `pXb`, `.env` ikut di-commit dengan placeholder `PRIVATE_KEY=0x`. Pola itu rawan: begitu kamu isi nilai asli dan menjalankan `git add -A`, kredensial ikut ter-push.
+
+Di repo ini `.env` ada di `.gitignore` dan **tidak** pernah di-commit. Supaya tetap nyaman dipakai, file-nya dibuat otomatis saat pertama kali script dijalankan, jadi `nano .env` tetap langsung bisa dipakai tanpa risiko bocor.
+
+Kalau perlu berbagi template, pakai `.env.example` (isinya placeholder saja).
 
 ### Ambil bearer token dari browser
 
@@ -92,6 +141,8 @@ Stop: `Ctrl+C`, atau `pkill -f "lim.js auto"`.
 
 | Command | Fungsi |
 |---|---|
+| `setup` | wizard isi `.env` tanpa editor (uji dulu, baru simpan) |
+| `edit` | buka `.env` di `nano`/`$EDITOR`, dibuat otomatis kalau belum ada |
 | `login` | simpan kredensial/token ke `.env` |
 | `logout` | hapus token dari `.env` (email/password tetap) |
 | `env` | tampilkan `.env` (disamarkan) |
