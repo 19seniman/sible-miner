@@ -69,7 +69,7 @@ const log = (m) => console.log(`${C.dim(new Date().toLocaleTimeString())} ${m}`)
 function readEnvFile(file = ENV_FILE) {
   const out = { __lines: [], __order: [] };
   if (!fs.existsSync(file)) return out;
-  const raw = fs.readFileSync(file, 'utf8');
+  const raw = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
   for (const line of raw.split(/\r?\n/)) {
     const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
     if (!m) {
@@ -957,13 +957,15 @@ function cmdEdit() {
   }
 
   const editor = String(flags_editor() || 'nano');
-  const candidates = editor === 'nano' ? ['nano', 'vim', 'vi'] : [editor];
+  const defaults =
+    process.platform === 'win32' ? ['notepad', 'code'] : ['nano', 'vim', 'vi'];
+  const candidates = editor === 'nano' || editor === 'notepad' ? defaults : [editor];
   for (const ed of candidates) {
     const r = spawnSync(ed, [ENV_FILE], { stdio: 'inherit' });
     if (r.error && r.error.code === 'ENOENT') {
-      if (ed === 'nano') {
-        console.log(C.y('nano belum terpasang di Termux.'));
-        console.log(C.dim('  pasang dulu:  pkg update && pkg install nano -y'));
+      if (ed === 'nano' || ed === 'notepad') {
+        console.log(C.y(`editor "${ed}" tidak ditemukan.`));
+        if (process.platform !== 'win32') console.log(C.dim('  pasang dulu:  pkg update && pkg install nano -y'));
         console.log(C.dim('  tanpa editor: node lim.js setup'));
       }
       continue;

@@ -267,6 +267,110 @@ crontab -e
 
 ---
 
+### Menjalankan di Windows (PowerShell)
+
+Script-nya murni Node.js tanpa dependency, jadi jalan apa adanya di Windows — tidak ada `chmod`, `pkill`, atau `nohup`.
+
+**1. Pasang Node.js (sekali saja)**
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+```
+
+Atau unduh installer LTS dari https://nodejs.org. Tutup lalu buka ulang PowerShell supaya `node` terbaca.
+
+**2. Ambil script**
+
+```powershell
+cd $HOME
+git clone https://github.com/19seniman/sible-miner.git
+cd sible-miner
+```
+
+Tanpa git: buka repo → **Code → Download ZIP** → extract → `cd` ke folder hasil extract.
+
+**3. Login**
+
+```powershell
+node lim.js login
+```
+
+Ditanya password lalu kode OTP, sama seperti di Termux. Versi tanpa prompt:
+
+```powershell
+node lim.js login --identifier emailkamu@mail.com --password 'passwordkamu'
+```
+
+**4. Verifikasi**
+
+```powershell
+node lim.js status
+```
+
+**5. Jalankan di background**
+
+PowerShell tidak punya `nohup`, jadi pakai `Start-Process`:
+
+```powershell
+Start-Process -FilePath "node" -ArgumentList "lim.js","auto" `
+  -RedirectStandardOutput "auto.log" -RedirectStandardError "auto.err" `
+  -WindowStyle Hidden
+```
+
+Catatan: `Start-Process` tidak boleh mengarahkan stdout dan stderr ke file yang sama.
+
+**6. Pantau log**
+
+```powershell
+Get-Content auto.log -Tail 20         # 20 baris terakhir
+Get-Content auto.log -Tail 20 -Wait   # ikuti terus, Ctrl+C untuk keluar
+```
+
+**7. Cek proses & hentikan**
+
+```powershell
+# cek apakah jalan
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Where-Object { $_.CommandLine -like "*lim.js*" } |
+  Select-Object ProcessId, CommandLine
+
+# hentikan
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Where-Object { $_.CommandLine -like "*lim.js*" } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+Jangan pakai `Stop-Process -Name node` — itu mematikan semua proses Node di laptopmu.
+
+**8. Supaya laptop tidak sleep saat mining**
+
+```powershell
+powercfg /change standby-timeout-ac 0     # colok listrik: jangan sleep
+powercfg /change monitor-timeout-ac 15    # layar tetap mati setelah 15 menit
+```
+
+Kalau laptop ditutup, Windows biasanya suspend — ubah lid action:
+
+```powershell
+powercfg /setacvalueindex SCHEME_CURRENT SUB_BUTTONS LIDACTION 0
+powercfg /S SCHEME_CURRENT
+```
+
+**9. Autostart saat login (opsional)**
+
+```powershell
+schtasks /create /tn "sible-miner" /sc onlogon /f ^
+  /tr "cmd /c cd /d %USERPROFILE%\sible-miner && node lim.js auto >> auto.log 2>&1"
+```
+
+Hapus lagi dengan `schtasks /delete /tn "sible-miner" /f`.
+
+**Bedanya dengan Termux:** tidak ada `termux-wake-lock`; yang perlu diurus adalah sleep dan lid close di atas. Selain itu perintah `node lim.js …` identik.
+
+`node lim.js edit` di Windows otomatis membuka Notepad, dan `.env` yang disimpan Notepad (UTF-8 + BOM, CRLF) tetap terbaca.
+
+---
+
 ## 3. Command lain
 
 | Command | Fungsi |
