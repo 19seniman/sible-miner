@@ -4,7 +4,7 @@ Script Node.js tanpa dependency untuk login, cek status, dan **auto-mining tiap 
 
 Butuh **Node.js 18+**. Tidak perlu `npm install`.
 
----
+
 
 ## 0. Jalankan cepat (Termux, dari nol sampai mining)
 
@@ -30,7 +30,7 @@ nohup node lim.js auto > sible-auto.log 2>&1 &
 
 # 6) pantau
 tail -f sible-auto.log
-```
+
 
 Setelah langkah 5, tidak ada yang perlu dijalankan tiap 3 jam — script mengurus siklus slot sendiri.
 
