@@ -4,14 +4,6 @@ Script Node.js tanpa dependency untuk login, cek status, dan **auto-mining tiap 
 
 Butuh **Node.js 18+**. Tidak perlu `npm install`.
 
-
-
-## 0. Jalankan cepat (Termux, dari nol sampai mining)
-
-Salin berurutan. Ganti email/password dengan milikmu.
-
-
-
 # 1) Install script
 ```
 git clone https://github.com/19seniman/sible-miner.git
