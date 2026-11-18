@@ -10,37 +10,34 @@ Butuh **Node.js 18+**. Tidak perlu `npm install`.
 
 Salin berurutan. Ganti email/password dengan milikmu.
 
-```bash
-# 1) dependensi (sekali saja)
-pkg update && pkg install nodejs git nano termux-api -y
 
-# 2) ambil script
+
+# 1) Install script
+```
 git clone https://github.com/19seniman/sible-miner.git
 cd sible-miner
+```
 
-# 3) login — diminta password, lalu kode OTP dari email
-node lim.js login
-
-# 4) pastikan token valid
-node lim.js status
-
-# 5) mulai auto-mining di background
-termux-wake-lock
-nohup node lim.js auto > sible-auto.log 2>&1 &
-
-# 6) pantau
-tail -f sible-auto.log
-
-
-Setelah langkah 5, tidak ada yang perlu dijalankan tiap 3 jam — script mengurus siklus slot sendiri.
-
-Kalau akunmu tidak pakai OTP, langkah 3 bisa langsung:
-
-```bash
+# 2) login — diminta password, lalu kode OTP dari email
+```
 node lim.js login --identifier emailkamu@mail.com --password 'passwordkamu'
 ```
 
----
+# 3) Cek status
+```
+node lim.js status
+```
+
+# 4) mulai auto-mining di background
+
+```termux-wake-lock
+nohup node lim.js auto > sible-auto.log 2>&1 &
+```
+
+# 5) pantau mining
+```
+tail -f sible-auto.log
+```
 
 ## 1. Setup
 
