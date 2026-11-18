@@ -1,4 +1,4 @@
-# sible.mjs — CLI + auto-miner untuk mine.sible.network
+# lim.js — CLI + auto-miner untuk mine.sible.network
 
 Script Node.js tanpa dependency untuk login, cek status, dan **auto-mining tiap slot 3 jam dengan auto-accelerate**.
 
@@ -29,10 +29,10 @@ Atau biarkan script yang menulis `.env` untukmu:
 
 ```bash
 # dari email + password
-node sible.mjs login --identifier emailkamu@mail.com --password 'passwordkamu'
+node lim.js login --identifier emailkamu@mail.com --password 'passwordkamu'
 
 # dari bearer token
-node sible.mjs login --token 'eyJhbGciOi...'
+node lim.js login --token 'eyJhbGciOi...'
 ```
 
 Kalau akun belum verifikasi email, tambahkan `--otp 123456`.
@@ -40,7 +40,7 @@ Kalau akun belum verifikasi email, tambahkan `--otp 123456`.
 Cek isi `.env` kapan pun (password/token disamarkan):
 
 ```bash
-node sible.mjs env
+node lim.js env
 ```
 
 File `.env` dibuat dengan permission `600`, dan sudah masuk `.gitignore`.
@@ -56,7 +56,7 @@ Token expired otomatis di-refresh lewat `/auth/refresh`, dan token baru **dituli
 ## 2. Auto mining + auto accelerate
 
 ```bash
-node sible.mjs auto
+node lim.js auto
 ```
 
 Yang dilakukan tiap iterasi:
@@ -70,21 +70,21 @@ Yang dilakukan tiap iterasi:
 Opsi:
 
 ```bash
-node sible.mjs auto --slot-hours 3      # paksa panjang slot 3 jam (default: dari server)
-node sible.mjs auto --max-ads 5         # batasi accelerate per sesi
-node sible.mjs auto --no-ad             # mining saja tanpa accelerate
-node sible.mjs auto --once              # satu putaran lalu keluar (cocok untuk cron)
-node sible.mjs auto --once --dry-run    # lihat rencana, tidak mengirim transaksi
+node lim.js auto --slot-hours 3      # paksa panjang slot 3 jam (default: dari server)
+node lim.js auto --max-ads 5         # batasi accelerate per sesi
+node lim.js auto --no-ad             # mining saja tanpa accelerate
+node lim.js auto --once              # satu putaran lalu keluar (cocok untuk cron)
+node lim.js auto --once --dry-run    # lihat rencana, tidak mengirim transaksi
 ```
 
 Contoh jalan terus di background:
 
 ```bash
-nohup node sible.mjs auto > sible-auto.log 2>&1 &
+nohup node lim.js auto > sible-auto.log 2>&1 &
 tail -f sible-auto.log
 ```
 
-Stop: `Ctrl+C`, atau `pkill -f "sible.mjs auto"`.
+Stop: `Ctrl+C`, atau `pkill -f "lim.js auto"`.
 
 ---
 
@@ -145,7 +145,7 @@ Error yang ditangani: `INVALID_CREDENTIALS`, `TOKEN_INVALID`, `SESSION_CHANGED`,
 node test/mock-server.mjs 8787 &
 # di terminal lain:
 printf 'SIBLE_IDENTIFIER=tester@mail.com\nSIBLE_PASSWORD=secret123\nSIBLE_API_BASE=http://127.0.0.1:8787/api/v1\n' > /tmp/t.env
-SIBLE_ENV_FILE=/tmp/t.env node sible.mjs auto --once
+SIBLE_ENV_FILE=/tmp/t.env node lim.js auto --once
 ```
 
 Untuk simulasi slot cepat, jalankan mock dengan `SLOT_SEC=6`.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * sible.mjs — CLI + auto-miner untuk mine.sible.network
+ * lim.js — CLI + auto-miner untuk mine.sible.network
  *
  * Zero dependencies. Node >= 18 (global fetch).
  *
@@ -28,11 +28,11 @@
  *   get <path> | post <path> '<json>'
  *
  * Contoh:
- *   node sible.mjs login --identifier you@mail.com --password 'secret'
- *   node sible.mjs login --token 'eyJhbGciOi...'
- *   node sible.mjs auto
- *   node sible.mjs auto --slot-hours 3 --max-ads 5
- *   node sible.mjs auto --once --dry-run
+ *   node lim.js login --identifier you@mail.com --password 'secret'
+ *   node lim.js login --token 'eyJhbGciOi...'
+ *   node lim.js auto
+ *   node lim.js auto --slot-hours 3 --max-ads 5
+ *   node lim.js auto --once --dry-run
  */
 
 import fs from 'node:fs';
@@ -502,7 +502,7 @@ async function request(method, p, opts = {}) {
     const retryable = e instanceof ApiError && (e.http === 401 || SESSION_DEAD.has(e.code));
     if (retryable && opts.auth !== false) {
       if (await doRefresh()) return rawRequest(method, p, opts);
-      throw new ApiError({ code: 'SESSION_EXPIRED', message: 'token ditolak & refresh gagal — jalankan: node sible.mjs login', path: p });
+      throw new ApiError({ code: 'SESSION_EXPIRED', message: 'token ditolak & refresh gagal — jalankan: node lim.js login', path: p });
     }
     throw e;
   }
@@ -990,7 +990,7 @@ async function cmdRaw(method, p, bodyArg) {
 // Main
 // ---------------------------------------------------------------------------
 
-const HELP = `sible.mjs — mine.sible.network client (creds in .env)
+const HELP = `lim.js — mine.sible.network client (creds in .env)
 
   login [--token T | --identifier EMAIL [--password P] [--otp CODE]]
   logout | env
@@ -1039,7 +1039,7 @@ async function main() {
     setTokens({ accessToken: t });
   }
 
-  if (!(await ensureAuth())) die('belum login — isi SIBLE_TOKEN atau SIBLE_IDENTIFIER+SIBLE_PASSWORD di .env, atau jalankan: node sible.mjs login');
+  if (!(await ensureAuth())) die('belum login — isi SIBLE_TOKEN atau SIBLE_IDENTIFIER+SIBLE_PASSWORD di .env, atau jalankan: node lim.js login');
 
   switch (cmd) {
     case 'me':

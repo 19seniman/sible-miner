@@ -1,4 +1,4 @@
-// mock-server.mjs — tiruan API Sible untuk menguji sible.mjs
+// mock-server.mjs — tiruan API Sible untuk menguji lim.js
 // Jalankan: node mock-server.mjs 8787
 import http from 'node:http';
 
