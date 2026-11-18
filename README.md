@@ -26,51 +26,13 @@ node lim.js status
 node lim.js auto 
 ```
 
-### Menjalankan di Windows (PowerShell)
-
-**1. Pasang Node.js (sekali saja)**
-
-```powershell
-winget install OpenJS.NodeJS.LTS
-```
-
-Atau unduh installer LTS dari https://nodejs.org. Tutup lalu buka ulang PowerShell supaya `node` terbaca.
-
-**2. Ambil script**
-
-```powershell
-cd $HOME
-git clone https://github.com/19seniman/sible-miner.git
-cd sible-miner
-```
-
-Tanpa git: buka repo → **Code → Download ZIP** → extract → `cd` ke folder hasil extract.
-
-**3. Login**
-
-```powershell
-node lim.js login --identifier emailkamu@mail.com --password 'passwordkamu'
-```
-**4. Verifikasi**
-
-```powershell
-node lim.js status
-```
-
-**5. Jalankan Mining**
-
-```powershell
-node lim.js auto
-```
-
 ## Author
 
-19Seniman · Traktir ☕
-
+19Seniman 
+· Traktir ☕
 BSC · ETH · Hype
 
 ```
 0xf01fb9a6855f175d3f3e28e00fa617009c38ef59
 ```
 
-Tampil juga di script: `node lim.js about`
