@@ -1,4 +1,4 @@
-# lim.js — CLI + auto-miner untuk mine.sible.network
+# auto-miner untuk mine.sible.network
 
 Script Node.js tanpa dependency untuk login, cek status, dan **auto-mining tiap slot 3 jam dengan auto-accelerate**.
 
